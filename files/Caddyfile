@@ -1,0 +1,56 @@
+https://newsletter.devopsiarz.pl {
+        root /home/www/www/newsletter.devopsiarz.pl
+        log / /home/www/newsletter.devopsiarz.pl.log "{combined}"
+        gzip
+
+        fastcgi / unix:/run/php-fpm/www.sock php
+
+        rewrite {
+        r \/\.
+                if {path} not_starts_with .well-known
+                to /index.php{uri}
+        }
+
+        # Custom sendy rewrites: main rewrite
+        # RewriteRule ^([a-zA-Z0-9-]+)$ $1.php [L]
+        rewrite {
+                r ^/([a-zA-Z0-9-]+)$
+                to {1}.php
+        }
+
+        # Link tracker
+        # RewriteRule ^l/([a-zA-Z0-9/]+)$ l.php?i=$1 [L]
+        rewrite {
+                r ^/l/([a-zA-Z0-9/]+)$
+                to l.php?i={1}
+        }
+
+        # Open tracker
+        # RewriteRule ^t/([a-zA-Z0-9/]+)$ t.php?i=$1 [L]
+        rewrite {
+                r ^/t/([a-zA-Z0-9/]+)$
+                to t.php?i={1}
+        }
+
+        # Web version
+        # RewriteRule ^w/([a-zA-Z0-9/]+)$ w.php?i=$1 [L]
+        rewrite {
+                r ^/w/([a-zA-Z0-9/]+)$
+                to w.php?i={1}
+        }
+
+        # unsubscribe
+        # RewriteRule ^unsubscribe/(.*)$ unsubscribe.php?i=$1 [L]
+        rewrite {
+                r ^/unsubscribe/(.*)$
+                to unsubscribe.php?i={1}
+        }
+
+        # subscribe
+        # RewriteRule ^subscribe/(.*)$ subscribe.php?i=$1 [L]
+        rewrite {
+                r ^/subscribe/(.*)$
+                to subscribe.php?i={1}
+        }
+
+}

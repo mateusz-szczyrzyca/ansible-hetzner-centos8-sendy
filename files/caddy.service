@@ -1,0 +1,17 @@
+[Unit]
+Description=Caddy webserver
+Documentation=https://caddyserver.com/
+After=network.target
+
+[Service]
+User=www
+Group=www
+WorkingDirectory=/home/www/www
+LimitNOFILE=16384
+PIDFile=/var/run/caddy/caddy.pid
+ExecStart=/usr/bin/caddy -agree -email mateusz@szczyrzyca.pl -pidfile=/var/run/caddy/caddy.pid -conf /home/www/Caddyfile
+Restart=on-failure
+StartLimitInterval=600
+
+[Install]
+WantedBy=multi-user.target

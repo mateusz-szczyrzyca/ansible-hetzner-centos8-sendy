@@ -1,0 +1,241 @@
+- hosts: all
+  gather_facts: yes
+  tasks:
+
+    - name: Setting SELinux config to enforcing
+      lineinfile:
+        path: /etc/selinux/config
+        regexp: '^SELINUX='
+        line: SELINUX=enforcing
+
+    - name: Making SELinux active now
+      shell: setenforce 1
+
+    - name: Adding www group
+      group:
+        name: www
+        state: present
+
+    - name: Add user www
+      user:
+        name: www
+        comment: user www
+        group: www
+
+    - name: Create ~/.ssh dir
+      file:
+        path: /home/www/.ssh
+        state: directory
+        owner: www
+        group: www
+        mode: '0700'
+
+    - name: Copy my ssh keys
+      copy:
+        src: /home/mateusz/.ssh/id_rsa.pub
+        dest: /home/www/.ssh/authorized_keys
+        owner: www
+        group: www
+        mode: '0600'
+
+    - name: Copy no-ip2.conf file
+      copy:
+        src: files/no-ip2.conf
+        dest: /etc/noip2.conf
+        owner: root
+        group: root
+        mode: '0600'
+
+    - name: Copy binary noip2 dp /usr/sbin
+      copy: 
+        src: files/noip2 
+        dest: /usr/sbin/noip2
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Copy systemd service file
+      copy:
+        src: files/noip2.service
+        dest: /etc/systemd/system
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Enable and start noip2 service
+      systemd:
+        daemon_reload: yes
+        enabled: yes
+        state: started
+        name: noip2
+
+    - name: upgrade all package
+      dnf: 
+        name: "*"
+        state: latest
+
+    - name: install epel-release repo
+      dnf:
+        name: "epel-release"
+        state: latest
+
+    - name: install important packages
+      dnf:
+        name:
+            - policycoreutils-python-utils
+            - wget
+            - git
+            - php-fpm
+            - php-cli
+            - php-mysqlnd
+            - php-xml
+            - php-json
+            - vim 
+            - unzip
+            - mariadb
+            - mariadb-server
+
+    - name: Disabling password authentication in ssh
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: 'PasswordAuthentication'
+        line: PasswordAuthentication no
+
+    - name: Setting new SSH port for ssh service
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        line: 'Port 22442'
+        state: present
+
+    - name: Setting SELinux to respect new SSH port
+      shell: semanage port -a -t ssh_port_t -p tcp "22442"
+
+    - name: Restart SSH service 
+      systemd:
+        state: restarted
+        name: sshd
+
+    - name: Disable MariaDB listening on all interfaces
+      lineinfile:
+        path: /etc/my.cnf.d/mariadb-server.cnf
+        firstmatch: yes
+        state: present
+        regexp: '^#*bind-address=.*'
+        line: bind-address=127.0.0.1
+
+    - name: Enable and start mariadb service
+      systemd:
+        enabled: yes
+        state: started
+        name: mariadb
+    
+    - name: Setting database
+      shell: |
+        (mysql -u root)<<EOF
+        UPDATE mysql.user SET Password = PASSWORD('{{dbadminpass}}') WHERE User = 'root';
+        DROP USER IF EXISTS ''@'localhost';
+        DROP USER IF EXISTS ''@'$(hostname)';
+        DROP USER IF EXISTS '{{dbusername}}'@'localhost';
+        DROP DATABASE IF EXISTS test;
+        DROP DATABASE IF EXISTS www;
+        CREATE DATABASE www;
+        CREATE USER '{{dbusername}}'@'localhost' IDENTIFIED BY '{{dbuserpass}}';
+        GRANT ALL PRIVILEGES ON www.* TO '{{dbusername}}'@'localhost';
+        FLUSH PRIVILEGES;
+        EOF
+
+    - name: Copy caddy binary to server
+      copy:
+        src: files/caddy
+        dest: /usr/bin/caddy
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Allowing caddy to use port 80
+      shell: setcap 'cap_net_bind_service=+ep' /usr/bin/caddy
+
+    - name: Copy caddy service file
+      copy:
+        src: files/caddy.service
+        dest: /etc/systemd/system
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Create ~/www for user www
+      file:
+        path: /home/www/www
+        state: directory
+        owner: www
+        group: www
+        mode: '0700'
+
+    - name: Copy sendy files
+      copy:
+        src: files/sendy-4.0.6.zip
+        dest: /home/www/www/sendy.zip
+        owner: www
+        group: www
+        mode: '0644'
+
+    - name: Unpack sendy files
+      unarchive:
+        src: /home/www/www/sendy.zip
+        dest: /home/www/www
+        owner: www
+        group: www
+        remote_src: yes
+
+    - name: Rename sendy directory
+      shell: mv sendy newsletter.devopsiarz.pl
+      args:
+        chdir: /home/www/www/
+
+    - name: Setting context for SELinux
+      shell: chcon -t httpd_sys_rw_content_t /home/www/www -R
+
+    - name: Copy Caddyfile
+      copy:
+        src: files/Caddyfile
+        dest: /home/www/Caddyfile
+        owner: www
+        group: www
+        mode: '0644'
+    
+    - name: Setting limit NOFILE for Caddy (just in case)
+      lineinfile:
+        path: /etc/systemd/system.conf
+        firstmatch: yes
+        state: present
+        regexp: '^#*DefaultLimitNOFILE'
+        line: DefaultLimitNOFILE=16384
+
+    - name: Enable and start caddy service
+      systemd:
+        daemon_reload: yes
+        enabled: yes
+        state: started
+        name: caddy
+
+    - name: Copy php-fpm config
+      copy:
+        src: files/newsletter.devopsiarz.pl.conf
+        dest: /etc/php-fpm.d/newsletter.devopsiarz.pl.conf
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Removing default PHP config
+      file:
+        path: /etc/php-fpm.d/www.conf
+        state: absent
+
+    - name: Enable and start php-fpm
+      systemd:
+        enabled: yes
+        state: started
+        name: php-fpm
+    
+    - name: Setting SELinux boolean to allow PHP to make connections
+      shell: setsebool -P httpd_can_network_connect 1
