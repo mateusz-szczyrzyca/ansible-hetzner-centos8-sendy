@@ -1,0 +1,12 @@
+    - name: Creating postfix for database name
+      command: date +"%Y%m%d_%H%M"
+      register: postfix
+
+    - name: Backup database
+      shell: mysqldump -u {{dbusername}} -p{{dbuserpass}} {{dbusername}} | 7za a database-backup-{{postfix.stdout}}.sql.7z -si
+
+    - name: Creating backup of current sendy directory...
+      archive:
+        path: "{{www_dir}}/{{sendy_www_dir}}/"
+        dest: "{{home_dir}}/{{sendy_www_dir}}.{{postfix.stdout}}.tar.bz2"
+        format: bz2

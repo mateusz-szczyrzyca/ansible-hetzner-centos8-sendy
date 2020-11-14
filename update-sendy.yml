@@ -1,0 +1,33 @@
+- hosts: all
+  gather_facts: yes
+  tasks:
+    - name: Creating backup points...
+      include_role:
+        name: backup
+
+    - name: Copying new sendy archive...
+      copy:
+         src: "{{sendy_archive}}"
+         dest: "{{home_dir}}/{{sendy_archive}}"
+         mode: 0644
+
+    - name: Unpack archive to dest dir...
+      unarchive:
+         src: "{{sendy_archive}}"
+         dest: "{{www_dir}}"
+
+    - name: Replace config.php from working installation...
+      copy:
+         src: "{{www_dir}}/{{sendy_www_dir}}/includes/config.php"
+         dest: "{{www_dir}}/sendy/includes/config.php"
+         remote_src: yes
+
+    - name: Rename current installation to old.*
+      shell: "! test -d old.{{sendy_www_dir}} && mv {{sendy_www_dir}} old.{{sendy_www_dir}}"
+      args:
+        chdir: "{{ www_dir }}"
+
+    - name: Renaming sendy to newest working installation
+      shell: "! test -d {{sendy_www_dir}} && mv sendy {{sendy_www_dir}}"
+      args:
+        chdir: "{{ www_dir }}"
