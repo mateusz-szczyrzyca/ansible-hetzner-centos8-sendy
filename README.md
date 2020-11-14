@@ -34,11 +34,11 @@ web server, MariaDB database and PHP. Sendy is a newsletter PHP application whic
 It uses [Amazon SES](https://docs.aws.amazon.com/ses/latest/DeveloperGuide/Welcome.html) to send your mails, hence your need 
 your Amazon AWS account.
 
-`backup_database.yml` ~~is a playbook which create backup of the database and downloads it on your local control machine.~~ DEPRECATED: it has been transformed to a role
+`backup_database.yml` ~~is a playbook which create backup of the database and downloads it on your local control machine.~~ DEPRECATED: it has been transformed to the role.
 
 Remember about setting your preferred credentials in `hosts_vars/your_host_name/password.yml` and use 
 `ansible-vault crypt` command afterwards to secure this file.
 
-`update-sendy.yml` updates sendy installation on-the-fly and makes backup of the database. Download sendy archive (usually in format `sendy-<version>.zip`) and use by the following command (example for sendy-5.0):
+`update-sendy.yml` updates sendy installation on-the-fly and makes backup of the database. Download sendy archive (usually in format `sendy-<version>.zip`) and use by the following command (example for `sendy-5.0` and for ssh user `www`):
 
 `$ ansible-playbook -u www update-sendy.yml -e "sendy_archive=sendy-5.0.zip"`
